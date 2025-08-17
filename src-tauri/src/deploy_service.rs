@@ -61,6 +61,14 @@ pub struct DeployProgress {
     pub error: Option<String>,
 }
 
+// Git信息结构体 - 移动到模块级别
+#[derive(Debug, Clone)]
+struct GitInfo {
+    branch: String,
+    commit_hash: String,
+    commit_message: String,
+}
+
 pub struct DeployService {
     app_handle: AppHandle,
     pub deploy_id: String,
@@ -190,13 +198,6 @@ impl DeployService {
         Ok(())
     }
 
-    // 定义Git信息结构
-    #[derive(Debug, Clone)]
-    struct GitInfo {
-        branch: String,
-        commit_hash: String,
-        commit_message: String,
-    }
 
     async fn clone_repository(&self, local_path: &str) -> Result<GitInfo> {
         let config = &self.config.git;

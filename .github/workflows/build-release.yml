@@ -1,0 +1,167 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: false
+        default: 'latest'
+        type: string
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+            name: 'macOS (Apple Silicon + Intel)'
+          - platform: 'windows-latest'
+            args: ''
+            name: 'Windows'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ inputs.version || 'latest' }}
+          releaseName: 'dTools ${{ inputs.version || 'latest' }}'
+          releaseBody: |
+            ## dTools Release ${{ inputs.version || 'latest' }}
+            
+            ### Downloads
+            - **Windows**: Download the `.msi` installer for Windows
+            - **macOS**: Download the `.dmg` installer for macOS (Universal - supports both Intel and Apple Silicon)
+            
+            ### Portable Versions
+            Portable versions are also available that don't require installation.
+            
+            ### Changes
+            See commit history for detailed changes.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  build-portable:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            target: 'universal-apple-darwin'
+            name: 'macOS-portable'
+            extension: 'app'
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            name: 'Windows-portable'
+            extension: 'exe'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app (portable)
+        run: |
+          cd src-tauri
+          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            cargo tauri build --target universal-apple-darwin
+          else
+            cargo tauri build --target ${{ matrix.target }}
+          fi
+        shell: bash
+
+      - name: Prepare portable artifacts (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          mkdir -p portable-artifacts
+          cp -r "src-tauri/target/universal-apple-darwin/release/bundle/macos/dTools.app" portable-artifacts/
+          cd portable-artifacts
+          zip -r "dTools-${{ inputs.version || 'latest' }}-macOS-portable.zip" dTools.app
+
+      - name: Prepare portable artifacts (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          mkdir portable-artifacts
+          copy "src-tauri\target\${{ matrix.target }}\release\dTools.exe" portable-artifacts\
+          cd portable-artifacts
+          Compress-Archive -Path "dTools.exe" -DestinationPath "dTools-${{ inputs.version || 'latest' }}-Windows-portable.zip"
+        shell: powershell
+
+      - name: Upload portable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-${{ inputs.version || 'latest' }}
+          path: portable-artifacts/*.zip
+          retention-days: 30
+
+      - name: Create release and upload portable assets
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.version || 'latest' }}
+          name: 'dTools ${{ inputs.version || 'latest' }}'
+          files: portable-artifacts/*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
