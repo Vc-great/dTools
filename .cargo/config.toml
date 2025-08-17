@@ -1,0 +1,8 @@
+# 移除 Windows 交叉编译配置，避免工具链冲突
+# [target.x86_64-pc-windows-msvc]
+# linker = "x86_64-w64-mingw32-gcc"
+# ar = "x86_64-w64-mingw32-ar"
+
+# [target.x86_64-pc-windows-gnu]
+# linker = "x86_64-w64-mingw32-gcc"
+# ar = "x86_64-w64-mingw32-ar"

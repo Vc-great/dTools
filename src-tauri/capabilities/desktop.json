@@ -1,0 +1,29 @@
+{
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "updater:default",
+    "store:default",
+    "autostart:default",
+    "opener:default",
+    "log:default",
+    "core:window:allow-toggle-maximize",
+    "fs:allow-download-write-recursive",
+    "fs:allow-app-read",
+    "fs:allow-app-write",
+    "fs:allow-app-read-recursive",
+    "fs:allow-app-write-recursive",
+    "fs:default",
+    "shell:allow-open",
+    "notification:default",
+    "dialog:default",
+    "process:default"
+  ]
+}
