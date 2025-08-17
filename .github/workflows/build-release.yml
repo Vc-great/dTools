@@ -56,14 +56,19 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Sync node version and setup cache
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-          cache: 'npm'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
@@ -137,17 +142,22 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Sync node version and setup cache
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-          cache: 'npm'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Build frontend
-        run: npm run build
+        run: pnpm run build
 
       - name: Build Tauri app (portable)
         env:
@@ -161,9 +171,9 @@ jobs:
         run: |
           cd src-tauri
           if [ "${{ matrix.platform }}" = "macos-latest" ]; then
-            cargo tauri build --target universal-apple-darwin
+            pnpm tauri build --target universal-apple-darwin
           else
-            cargo tauri build --target ${{ matrix.target }}
+            pnpm tauri build --target ${{ matrix.target }}
           fi
         shell: bash
 
