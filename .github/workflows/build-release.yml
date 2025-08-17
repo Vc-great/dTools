@@ -42,6 +42,9 @@ jobs:
           echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
           echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -66,12 +69,16 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENSSL_DIR: ${{ matrix.platform == 'macos-latest' && env.OPENSSL_DIR || '' }}
-          OPENSSL_ROOT_DIR: ${{ matrix.platform == 'macos-latest' && env.OPENSSL_ROOT_DIR || '' }}
-          PKG_CONFIG_PATH: ${{ matrix.platform == 'macos-latest' && env.PKG_CONFIG_PATH || '' }}
+          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
+          OPENSSL_ROOT_DIR: ${{ env.OPENSSL_ROOT_DIR }}
+          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INCLUDE_DIR }}
+          OPENSSL_LIB_DIR: ${{ env.OPENSSL_LIB_DIR }}
+          OPENSSL_STATIC: ${{ env.OPENSSL_STATIC }}
+          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
+          PKG_CONFIG_ALLOW_CROSS: "1"
         with:
-          tagName: ${{ inputs.version || 'latest' }}
-          releaseName: 'dTools ${{ inputs.version || 'latest' }}'
+          tagName: "${{ inputs.version || 'latest' }}"
+          releaseName: "dTools ${{ inputs.version || 'latest' }}"
           releaseBody: |
             ## dTools Release ${{ inputs.version || 'latest' }}
             
@@ -116,6 +123,9 @@ jobs:
           echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
           echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -141,9 +151,13 @@ jobs:
 
       - name: Build Tauri app (portable)
         env:
-          OPENSSL_DIR: ${{ matrix.platform == 'macos-latest' && env.OPENSSL_DIR || '' }}
-          OPENSSL_ROOT_DIR: ${{ matrix.platform == 'macos-latest' && env.OPENSSL_ROOT_DIR || '' }}
-          PKG_CONFIG_PATH: ${{ matrix.platform == 'macos-latest' && env.PKG_CONFIG_PATH || '' }}
+          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
+          OPENSSL_ROOT_DIR: ${{ env.OPENSSL_ROOT_DIR }}
+          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INCLUDE_DIR }}
+          OPENSSL_LIB_DIR: ${{ env.OPENSSL_LIB_DIR }}
+          OPENSSL_STATIC: ${{ env.OPENSSL_STATIC }}
+          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
+          PKG_CONFIG_ALLOW_CROSS: "1"
         run: |
           cd src-tauri
           if [ "${{ matrix.platform }}" = "macos-latest" ]; then
@@ -153,13 +167,13 @@ jobs:
           fi
         shell: bash
 
-      - name: Create dist directory (cross-platform)
+      - name: Create portable artifacts directory
         run: |
           if [ "${{ matrix.platform }}" = "windows-latest" ]; then
-            if [ ! -d "portable-artifacts" ]; then
-              mkdir portable-artifacts
-            fi
+            # Windows: 使用 PowerShell 但添加错误处理
+            powershell -Command "if (!(Test-Path 'portable-artifacts')) { New-Item -ItemType Directory -Path 'portable-artifacts' -Force }"
           else
+            # Unix: 使用 mkdir -p
             mkdir -p portable-artifacts
           fi
         shell: bash
@@ -191,7 +205,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.version || 'latest' }}
-          name: 'dTools ${{ inputs.version || 'latest' }}'
+          name: "dTools ${{ inputs.version || 'latest' }}"
           files: portable-artifacts/*.zip
           draft: false
           prerelease: false
