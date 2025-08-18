@@ -37,40 +37,18 @@ jobs:
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-20.04'
+        shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
-        shell: bash
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf pkg-config libssl-dev
 
-      - name: Install OpenSSL and setup cross-compilation (macOS)
+      - name: Install OpenSSL dependencies (macOS)
         if: matrix.platform == 'macos-latest'
-        run: |
-          brew install openssl@3 || true
-          BREW_OPENSSL_PREFIX="$(brew --prefix openssl@3 || echo /usr/local/opt/openssl@3)"
-
-          if [[ "${{ matrix.target }}" == "x86_64-apple-darwin" ]]; then
-            sudo mkdir -p /usr/local/opt
-            sudo ln -sf "${BREW_OPENSSL_PREFIX}" /usr/local/opt/openssl@3 || true
-            echo "OPENSSL_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "OPENSSL_ROOT_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "PKG_CONFIG_PATH=${BREW_OPENSSL_PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-            echo "OPENSSL_INCLUDE_DIR=${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
-            echo "OPENSSL_LIB_DIR=${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
-            echo "CFLAGS_x86_64_apple_darwin=-I${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
-            echo "LDFLAGS_x86_64_apple_darwin=-L${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
-          else
-            echo "OPENSSL_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "OPENSSL_ROOT_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "PKG_CONFIG_PATH=${BREW_OPENSSL_PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-            echo "OPENSSL_INCLUDE_DIR=${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
-            echo "OPENSSL_LIB_DIR=${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
-          fi
-
-          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-          # 新增：强制链接 libssl 和 libcrypto
-          echo "OPENSSL_LIBS=-lssl -lcrypto" >> $GITHUB_ENV
         shell: bash
+        run: |
+          brew install pkg-config openssl@3 || true
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -94,23 +72,15 @@ jobs:
           cache: 'pnpm'
 
       - name: Install frontend dependencies
-        run: pnpm install
         shell: bash
+        run: pnpm install
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
-          OPENSSL_ROOT_DIR: ${{ env.OPENSSL_ROOT_DIR }}
-          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INCLUDE_DIR }}
-          OPENSSL_LIB_DIR: ${{ env.OPENSSL_LIB_DIR }}
-          OPENSSL_STATIC: ${{ env.OPENSSL_STATIC }}
           PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
-          PKG_CONFIG_ALLOW_CROSS: ${{ env.PKG_CONFIG_ALLOW_CROSS }}
-          CFLAGS_x86_64_apple_darwin: ${{ env.CFLAGS_x86_64_apple_darwin }}
-          LDFLAGS_x86_64_apple_darwin: ${{ env.LDFLAGS_x86_64_apple_darwin }}
-          OPENSSL_LIBS: ${{ env.OPENSSL_LIBS }}
+          OPENSSL_NO_VENDOR: ${{ env.OPENSSL_NO_VENDOR }}
         with:
           tagName: "${{ inputs.version || 'latest' }}"
           releaseName: "dTools ${{ inputs.version || 'latest' }}"
@@ -153,34 +123,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install OpenSSL and setup cross-compilation (macOS)
+      - name: Install OpenSSL dependencies (macOS)
         if: matrix.platform == 'macos-latest'
-        run: |
-          brew install openssl@3 || true
-          BREW_OPENSSL_PREFIX="$(brew --prefix openssl@3 || echo /usr/local/opt/openssl@3)"
-
-          if [[ "${{ matrix.target }}" == "x86_64-apple-darwin" ]]; then
-            sudo mkdir -p /usr/local/opt
-            sudo ln -sf "${BREW_OPENSSL_PREFIX}" /usr/local/opt/openssl@3 || true
-            echo "OPENSSL_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "OPENSSL_ROOT_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "PKG_CONFIG_PATH=${BREW_OPENSSL_PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-            echo "OPENSSL_INCLUDE_DIR=${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
-            echo "OPENSSL_LIB_DIR=${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
-            echo "CFLAGS_x86_64_apple_darwin=-I${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
-            echo "LDFLAGS_x86_64_apple_darwin=-L${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
-          else
-            echo "OPENSSL_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "OPENSSL_ROOT_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
-            echo "PKG_CONFIG_PATH=${BREW_OPENSSL_PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-            echo "OPENSSL_INCLUDE_DIR=${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
-            echo "OPENSSL_LIB_DIR=${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
-          fi
-
-          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-          echo "OPENSSL_LIBS=-lssl -lcrypto" >> $GITHUB_ENV
         shell: bash
+        run: |
+          brew install pkg-config openssl@3 || true
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -204,36 +153,28 @@ jobs:
           cache: 'pnpm'
 
       - name: Install frontend dependencies
-        run: pnpm install
         shell: bash
+        run: pnpm install
 
       - name: Build frontend
-        run: pnpm run build
         shell: bash
+        run: pnpm run build
 
       - name: Build Tauri app (portable)
         env:
-          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
-          OPENSSL_ROOT_DIR: ${{ env.OPENSSL_ROOT_DIR }}
-          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INCLUDE_DIR }}
-          OPENSSL_LIB_DIR: ${{ env.OPENSSL_LIB_DIR }}
-          OPENSSL_STATIC: ${{ env.OPENSSL_STATIC }}
           PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
-          PKG_CONFIG_ALLOW_CROSS: ${{ env.PKG_CONFIG_ALLOW_CROSS }}
-          CFLAGS_x86_64_apple_darwin: ${{ env.CFLAGS_x86_64_apple_darwin }}
-          LDFLAGS_x86_64_apple_darwin: ${{ env.LDFLAGS_x86_64_apple_darwin }}
-          OPENSSL_LIBS: ${{ env.OPENSSL_LIBS }}
+          OPENSSL_NO_VENDOR: ${{ env.OPENSSL_NO_VENDOR }}
+        shell: bash
         run: |
           cd src-tauri
           pnpm tauri build --target ${{ matrix.target }}
-        shell: bash
 
-      - name: Create portable artifacts directory (macos / linux)
+      - name: Create portable artifacts directory (macOS / Linux)
         if: matrix.platform != 'windows-latest'
-        run: mkdir -p portable-artifacts
         shell: bash
+        run: mkdir -p portable-artifacts
 
-      - name: Create portable artifacts directory (windows)
+      - name: Create portable artifacts directory (Windows)
         if: matrix.platform == 'windows-latest'
         shell: powershell
         run: |
@@ -243,11 +184,11 @@ jobs:
 
       - name: Prepare portable artifacts (macOS)
         if: matrix.platform == 'macos-latest'
+        shell: bash
         run: |
           cp -r "src-tauri/target/${{ matrix.target }}/release/bundle/macos/dTools.app" portable-artifacts/
           cd portable-artifacts
           zip -r "dTools-${{ inputs.version || 'latest' }}-macOS-${{ matrix.target }}-portable.zip" dTools.app
-        shell: bash
 
       - name: Prepare portable artifacts (Windows)
         if: matrix.platform == 'windows-latest'
