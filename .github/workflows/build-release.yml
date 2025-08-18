@@ -4,210 +4,173 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version'
+        description: "Release version"
         required: false
-        default: 'latest'
+        default: "latest"
         type: string
 
 jobs:
   build-tauri:
-    permissions:
-      contents: write
+    permissions: { contents: write }
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-            name: 'macOS (Apple Silicon)'
-            target: 'aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-            name: 'macOS (Intel)'
-            target: 'x86_64-apple-darwin'
-          - platform: 'windows-latest'
-            args: ''
-            name: 'Windows'
-            target: 'x86_64-pc-windows-msvc'
+          - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
+            name: "macOS Apple Silicon"
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin"
+            name: "macOS Intel"
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            name: "Windows"
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-20.04'
+      - name: Install build dependencies (Linux)
+        if: runner.os == "Linux"
+        run: sudo apt-get update && \
+          sudo apt-get install -y pkg-config libssl-dev perl make build-essential
         shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf pkg-config libssl-dev
 
-      - name: Install OpenSSL dependencies (macOS)
-        if: matrix.platform == 'macos-latest'
+      - name: Install build dependencies (macOS)
+        if: runner.os == "macOS"
+        run: brew install pkg-config openssl@3 perl make
         shell: bash
-        run: |
-          brew install pkg-config openssl@3 || true
-          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
 
-      - name: Rust setup
+      - name: Install build dependencies (Windows)
+        if: runner.os == "Windows"
+        run: |
+          choco install mingw make perl -y
+        shell: powershell
+
+      - name: Rust toolchain setup
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
+      - uses: pnpm/action-setup@v2
+        with: { version: 8 }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-          cache: 'pnpm'
+      - uses: actions/setup-node@v4
+        with: { node-version: "lts/*", cache: "pnpm" }
 
-      - name: Install frontend dependencies
+      - run: pnpm install
         shell: bash
-        run: pnpm install
 
-      - name: Build the app
-        uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
-          OPENSSL_NO_VENDOR: ${{ env.OPENSSL_NO_VENDOR }}
         with:
           tagName: "${{ inputs.version || 'latest' }}"
           releaseName: "dTools ${{ inputs.version || 'latest' }}"
           releaseBody: |
             ## dTools Release ${{ inputs.version || 'latest' }}
-            
             ### Downloads
-            - **Windows**: Download the `.msi` installer for Windows
-            - **macOS Intel**: Download the Intel Mac installer
-            - **macOS Apple Silicon**: Download the Apple Silicon (M1/M2) Mac installer
-            
+            - **Windows**: .msi installer
+            - **macOS Intel**: macOS Intel installer
+            - **macOS Apple Silicon**: Apple Silicon installer
             ### Changes
-            See commit history for detailed changes.
+            See commit history.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
   build-portable:
-    permissions:
-      contents: write
+    permissions: { contents: write }
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            target: 'aarch64-apple-darwin'
-            name: 'macOS-portable-arm64'
-            extension: 'app'
-          - platform: 'macos-latest'
-            target: 'x86_64-apple-darwin'
-            name: 'macOS-portable-x64'
-            extension: 'app'
-          - platform: 'windows-latest'
-            target: 'x86_64-pc-windows-msvc'
-            name: 'Windows-portable'
-            extension: 'exe'
+          - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
+            name: "macOS-portable-arm64"
+            extension: "app"
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin"
+            name: "macOS-portable-x64"
+            extension: "app"
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            name: "Windows-portable"
+            extension: "exe"
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install OpenSSL dependencies (macOS)
-        if: matrix.platform == 'macos-latest'
+      - name: Install build dependencies
+        if: runner.os == "Linux"
+        run: sudo apt-get update && \
+          sudo apt-get install -y pkg-config libssl-dev perl make build-essential
         shell: bash
+      - name: Install build dependencies
+        if: runner.os == "macOS"
+        run: brew install pkg-config openssl@3 perl make
+        shell: bash
+      - name: Install build dependencies
+        if: runner.os == "Windows"
         run: |
-          brew install pkg-config openssl@3 || true
-          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
+          choco install mingw make perl -y
+        shell: powershell
 
-      - name: Rust setup
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
+      - uses: pnpm/action-setup@v2
+        with: { version: 8 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "lts/*", cache: "pnpm" }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-          cache: 'pnpm'
-
-      - name: Install frontend dependencies
+      - run: pnpm install && pnpm run build
         shell: bash
-        run: pnpm install
 
-      - name: Build frontend
-        shell: bash
-        run: pnpm run build
-
-      - name: Build Tauri app (portable)
+      - name: Build Tauri portable
         env:
-          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
-          OPENSSL_NO_VENDOR: ${{ env.OPENSSL_NO_VENDOR }}
-        shell: bash
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd src-tauri
           pnpm tauri build --target ${{ matrix.target }}
-
-      - name: Create portable artifacts directory (macOS / Linux)
-        if: matrix.platform != 'windows-latest'
         shell: bash
+
+      - name: Create artifacts dir
         run: mkdir -p portable-artifacts
+        shell: bash
 
-      - name: Create portable artifacts directory (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: powershell
-        run: |
-          if (!(Test-Path -Path "portable-artifacts")) {
-            New-Item -ItemType Directory -Path "portable-artifacts" | Out-Null
-          }
-
-      - name: Prepare portable artifacts (macOS)
-        if: matrix.platform == 'macos-latest'
+      - name: Prepare artifacts (macOS)
+        if: runner.os == "macOS"
         shell: bash
         run: |
           cp -r "src-tauri/target/${{ matrix.target }}/release/bundle/macos/dTools.app" portable-artifacts/
-          cd portable-artifacts
-          zip -r "dTools-${{ inputs.version || 'latest' }}-macOS-${{ matrix.target }}-portable.zip" dTools.app
+          zip -r "portable-artifacts/dTools-${{ inputs.version || 'latest' }}-macOS-${{ matrix.target }}.zip" dTools.app
 
-      - name: Prepare portable artifacts (Windows)
-        if: matrix.platform == 'windows-latest'
+      - name: Prepare artifacts (Windows)
+        if: runner.os == "Windows"
         shell: powershell
         run: |
           $src = "src-tauri/target/${{ matrix.target }}/release/dTools.exe"
-          Copy-Item -Path $src -Destination "portable-artifacts" -Force
-          Set-Location portable-artifacts
-          Compress-Archive -Path "dTools.exe" -DestinationPath "dTools-${{ inputs.version || 'latest' }}-Windows-portable.zip" -Force
+          Copy-Item -Path $src -Destination portable-artifacts -Force
+          Compress-Archive -Path portable-artifacts/dTools.exe -DestinationPath portable-artifacts/dTools-${{ inputs.version || 'latest' }}-Windows-portable.zip
 
-      - name: Upload portable artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-${{ inputs.version || 'latest' }}
           path: portable-artifacts/*.zip
           retention-days: 30
 
-      - name: Create release and upload portable assets
-        if: github.event_name == 'workflow_dispatch'
+      - if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.version || 'latest' }}
