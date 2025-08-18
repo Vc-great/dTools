@@ -83,6 +83,15 @@ jobs:
       - name: Build frontend
         run: pnpm run build
 
+      - name: Verify frontend build
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Frontend build failed - dist directory not found"
+            exit 1
+          fi
+          echo "✅ Frontend build successful - dist directory exists"
+          ls -la dist/
+
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
@@ -114,6 +123,7 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
+          args: --target aarch64-apple-darwin
 
   build-windows:
     name: Build Windows (${{ matrix.arch }})
@@ -181,6 +191,16 @@ jobs:
       - name: Build frontend
         run: pnpm run build
 
+      - name: Verify frontend build
+        run: |
+          if (!(Test-Path "dist")) {
+            Write-Host "❌ Frontend build failed - dist directory not found" -ForegroundColor Red
+            exit 1
+          }
+          Write-Host "✅ Frontend build successful - dist directory exists" -ForegroundColor Green
+          Get-ChildItem dist -Force
+        shell: powershell
+
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
@@ -211,7 +231,7 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
-          args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+          args: --target ${{ matrix.target }}
 
   create-portable-windows:
     name: Create Windows Portable Version
