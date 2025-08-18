@@ -123,7 +123,6 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
-          args: --target aarch64-apple-darwin
 
   build-windows:
     name: Build Windows (${{ matrix.arch }})
