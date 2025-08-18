@@ -255,22 +255,22 @@ jobs:
           
           # 创建便携版配置文件和说明
           $readmeContent = @"
-# dTools 便携版
+          # dTools 便携版
 
-这是 dTools 的便携版本，无需安装即可使用。
+          这是 dTools 的便携版本，无需安装即可使用。
 
-## 使用方法
-1. 解压所有文件到任意目录
-2. 双击 dTools.exe 运行程序
-3. 程序设置和数据将保存在同级目录下
+          ## 使用方法
+          1. 解压所有文件到任意目录
+          2. 双击 dTools.exe 运行程序
+          3. 程序设置和数据将保存在同级目录下
 
-## 系统要求
-- Windows 10 或更高版本
+          ## 系统要求
+          - Windows 10 或更高版本
 
-## 注意事项
-- 首次运行可能会被 Windows Defender 拦截，请选择"仍要运行"
-- 如遇到问题，请尝试以管理员身份运行
-"@
+          ## 注意事项
+          - 首次运行可能会被 Windows Defender 拦截，请选择"仍要运行"
+          - 如遇到问题，请尝试以管理员身份运行
+          "@
           
           if (Test-Path "./portable-x64/dTools.exe") {
             Set-Content -Path "./portable-x64/README.txt" -Value $readmeContent -Encoding UTF8
