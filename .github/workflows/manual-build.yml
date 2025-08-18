@@ -91,12 +91,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 移除单独的前端构建步骤，让 Tauri 自己处理
-      # - name: Build frontend
-      #   run: pnpm run build
+      # 移除注释，重新添加前端构建步骤
 
+      # 先单独构建前端，不传递任何 target 参数
+      - name: Build frontend
+        run: pnpm run build
+
+      # 然后使用 Tauri CLI 直接构建，避免 tauri-action 的参数传递问题
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v0
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: "--max_old_space_size=4096"
@@ -110,10 +113,20 @@ jobs:
           # Windows signing (如果有Windows代码签名证书，取消注释以下环境变量)
           # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          if [ "${{ github.event.inputs.build_type }}" = "debug" ]; then
+            pnpm tauri build --target ${{ matrix.target }} --debug
+          else
+            pnpm tauri build --target ${{ matrix.target }}
+          fi
+
+      # 创建 GitHub Release（如果需要）
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: manual-build-${{ github.run_number }}
-          releaseName: "dTools Manual Build #${{ github.run_number }}"
-          releaseBody: |
+          tag_name: manual-build-${{ github.run_number }}
+          name: "dTools Manual Build #${{ github.run_number }}"
+          body: |
             ## Manual Build #${{ github.run_number }}
             
             **Build Info:**
@@ -131,11 +144,12 @@ jobs:
             - Windows ARM64: *_arm64-setup.exe
             
             **注意:** 这是手动构建版本，仅用于测试目的。
-          releaseDraft: false
+          draft: false
           prerelease: true
-          tauriScript: pnpm
-          # 修复：只将目标和调试参数传递给 Tauri，不传递给前端构建
-          args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+          files: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*
+            src-tauri/target/${{ matrix.target }}/debug/bundle/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
