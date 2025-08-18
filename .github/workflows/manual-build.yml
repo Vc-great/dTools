@@ -1,0 +1,214 @@
+name: Manual Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+permissions: write-all
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+
+concurrency:
+  group: "${{ github.workflow }} - ${{ github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build for ${{ matrix.platform }} (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon
+          - platform: macos-latest
+            arch: aarch64
+            target: aarch64-apple-darwin
+            bundle_name: "dTools_${{ github.ref_name || 'manual' }}_aarch64.dmg"
+          # Windows x64
+          - platform: windows-latest
+            arch: x64
+            target: x86_64-pc-windows-msvc
+            bundle_name: "dTools_${{ github.ref_name || 'manual' }}_x64-setup.exe"
+          # Windows ARM64
+          - platform: windows-latest
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+            bundle_name: "dTools_${{ github.ref_name || 'manual' }}_arm64-setup.exe"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-all-crates: true
+          key: ${{ matrix.target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: "--max_old_space_size=4096"
+          # Apple signing (如果有Apple开发者证书，取消注释以下环境变量)
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows signing (如果有Windows代码签名证书，取消注释以下环境变量)
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: manual-build-${{ github.run_number }}
+          releaseName: "dTools Manual Build #${{ github.run_number }}"
+          releaseBody: |
+            ## Manual Build #${{ github.run_number }}
+            
+            **Build Info:**
+            - Build Type: ${{ github.event.inputs.build_type }}
+            - Commit: ${{ github.sha }}
+            - Build Time: ${{ github.run_started_at }}
+            
+            **下载说明:**
+            
+            ### macOS
+            - macOS Apple Silicon (M1/M2/M3): `*_aarch64.dmg`
+            
+            ### Windows
+            - Windows 64位: `*_x64-setup.exe`
+            - Windows ARM64: `*_arm64-setup.exe`
+            
+            **注意:** 这是手动构建版本，仅用于测试目的。
+          releaseDraft: false
+          prerelease: true
+          tauriScript: pnpm
+          args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-artifacts
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*
+            src-tauri/target/${{ matrix.target }}/debug/bundle/**/*
+          retention-days: 30
+
+  create-portable-windows:
+    name: Create Windows Portable Version
+    needs: build
+    runs-on: windows-latest
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Windows x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-latest-x64-artifacts
+          path: ./artifacts/x64
+
+      - name: Download Windows ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-latest-arm64-artifacts
+          path: ./artifacts/arm64
+
+      - name: Create Portable Packages
+        run: |
+          # 创建便携版目录
+          mkdir portable-x64
+          mkdir portable-arm64
+          
+          # 查找并复制可执行文件 (x64)
+          $x64_exe = Get-ChildItem -Path "./artifacts/x64" -Name "*.exe" -Recurse | Where-Object { $_ -notmatch "setup|install" } | Select-Object -First 1
+          if ($x64_exe) {
+            $x64_exe_path = Get-ChildItem -Path "./artifacts/x64" -Name $x64_exe -Recurse | Select-Object -First 1
+            Copy-Item $x64_exe_path.FullName -Destination "./portable-x64/dTools.exe"
+            
+            # 创建便携版配置文件
+            Set-Content -Path "./portable-x64/portable.txt" -Value "This is a portable version of dTools"
+            
+            # 压缩便携版
+            Compress-Archive -Path "./portable-x64/*" -DestinationPath "dTools_${{ github.ref_name || 'manual' }}_x64-portable.zip"
+          }
+          
+          # 查找并复制可执行文件 (ARM64)
+          $arm64_exe = Get-ChildItem -Path "./artifacts/arm64" -Name "*.exe" -Recurse | Where-Object { $_ -notmatch "setup|install" } | Select-Object -First 1
+          if ($arm64_exe) {
+            $arm64_exe_path = Get-ChildItem -Path "./artifacts/arm64" -Name $arm64_exe -Recurse | Select-Object -First 1
+            Copy-Item $arm64_exe_path.FullName -Destination "./portable-arm64/dTools.exe"
+            
+            # 创建便携版配置文件
+            Set-Content -Path "./portable-arm64/portable.txt" -Value "This is a portable version of dTools"
+            
+            # 压缩便携版
+            Compress-Archive -Path "./portable-arm64/*" -DestinationPath "dTools_${{ github.ref_name || 'manual' }}_arm64-portable.zip"
+          }
+
+      - name: Upload portable packages to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: manual-build-${{ github.run_number }}
+          files: |
+            dTools_*_*-portable.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload portable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-packages
+          path: |
+            dTools_*_*-portable.zip
+          retention-days: 30
