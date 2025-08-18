@@ -4,68 +4,78 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version"
+        description: 'Release version'
         required: false
-        default: "latest"
+        default: 'latest'
         type: string
 
 jobs:
   build-tauri:
-    permissions: { contents: write }
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
-            target: "aarch64-apple-darwin"
-            name: "macOS Apple Silicon"
-          - platform: "macos-latest"
-            target: "x86_64-apple-darwin"
-            name: "macOS Intel"
-          - platform: "windows-latest"
-            target: "x86_64-pc-windows-msvc"
-            name: "Windows"
+          - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
+            name: 'macOS Apple Silicon'
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            name: 'macOS Intel'
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            name: 'Windows'
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build dependencies (Linux)
-        if: runner.os == "Linux"
-        run: sudo apt-get update && \
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev perl make build-essential
         shell: bash
 
       - name: Install build dependencies (macOS)
-        if: runner.os == "macOS"
-        run: brew install pkg-config openssl@3 perl make
+        if: runner.os == 'macOS'
+        run: |
+          brew install pkg-config openssl@3 perl make
         shell: bash
 
       - name: Install build dependencies (Windows)
-        if: runner.os == "Windows"
-        run: |
-          choco install mingw make perl -y
+        if: runner.os == 'Windows'
+        run: choco install mingw make perl -y
         shell: powershell
 
-      - name: Rust toolchain setup
+      - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - uses: swatinem/rust-cache@v2
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: './src-tauri -> target'
 
-      - uses: pnpm/action-setup@v2
-        with: { version: 8 }
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
-      - uses: actions/setup-node@v4
-        with: { node-version: "lts/*", cache: "pnpm" }
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
 
-      - run: pnpm install
+      - name: Install frontend dependencies
+        run: pnpm install
         shell: bash
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -73,71 +83,88 @@ jobs:
           releaseName: "dTools ${{ inputs.version || 'latest' }}"
           releaseBody: |
             ## dTools Release ${{ inputs.version || 'latest' }}
+            
             ### Downloads
-            - **Windows**: .msi installer
-            - **macOS Intel**: macOS Intel installer
-            - **macOS Apple Silicon**: Apple Silicon installer
+            - **Windows**: Download the `.msi` installer
+            - **macOS Intel**: Download the Intel Mac installer
+            - **macOS Apple Silicon**: Download the Apple Silicon installer
+            
             ### Changes
-            See commit history.
+            See commit history for details.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
   build-portable:
-    permissions: { contents: write }
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
-            target: "aarch64-apple-darwin"
-            name: "macOS-portable-arm64"
-            extension: "app"
-          - platform: "macos-latest"
-            target: "x86_64-apple-darwin"
-            name: "macOS-portable-x64"
-            extension: "app"
-          - platform: "windows-latest"
-            target: "x86_64-pc-windows-msvc"
-            name: "Windows-portable"
-            extension: "exe"
+          - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
+            name: 'macOS-portable-arm64'
+            extension: 'app'
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            name: 'macOS-portable-x64'
+            extension: 'app'
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            name: 'Windows-portable'
+            extension: 'exe'
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        if: runner.os == "Linux"
-        run: sudo apt-get update && \
+      - name: Install build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev perl make build-essential
         shell: bash
-      - name: Install build dependencies
-        if: runner.os == "macOS"
-        run: brew install pkg-config openssl@3 perl make
-        shell: bash
-      - name: Install build dependencies
-        if: runner.os == "Windows"
+
+      - name: Install build dependencies (macOS)
+        if: runner.os == 'macOS'
         run: |
-          choco install mingw make perl -y
+          brew install pkg-config openssl@3 perl make
+        shell: bash
+
+      - name: Install build dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install mingw make perl -y
         shell: powershell
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - uses: swatinem/rust-cache@v2
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: './src-tauri -> target'
 
-      - uses: pnpm/action-setup@v2
-        with: { version: 8 }
-      - uses: actions/setup-node@v4
-        with: { node-version: "lts/*", cache: "pnpm" }
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
-      - run: pnpm install && pnpm run build
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+
+      - name: Install & build frontend
+        run: |
+          pnpm install
+          pnpm run build
         shell: bash
 
-      - name: Build Tauri portable
+      - name: Build portable artifact
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -145,19 +172,19 @@ jobs:
           pnpm tauri build --target ${{ matrix.target }}
         shell: bash
 
-      - name: Create artifacts dir
+      - name: Create artifacts directory
         run: mkdir -p portable-artifacts
         shell: bash
 
-      - name: Prepare artifacts (macOS)
-        if: runner.os == "macOS"
+      - name: Prepare macOS artifact
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           cp -r "src-tauri/target/${{ matrix.target }}/release/bundle/macos/dTools.app" portable-artifacts/
           zip -r "portable-artifacts/dTools-${{ inputs.version || 'latest' }}-macOS-${{ matrix.target }}.zip" dTools.app
 
-      - name: Prepare artifacts (Windows)
-        if: runner.os == "Windows"
+      - name: Prepare Windows artifact
+        if: runner.os == 'Windows'
         shell: powershell
         run: |
           $src = "src-tauri/target/${{ matrix.target }}/release/dTools.exe"
@@ -170,7 +197,8 @@ jobs:
           path: portable-artifacts/*.zip
           retention-days: 30
 
-      - if: github.event_name == 'workflow_dispatch'
+      - name: Create release and upload portable assets
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.version || 'latest' }}
