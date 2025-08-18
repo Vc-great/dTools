@@ -93,7 +93,7 @@ jobs:
           ls -la dist/
 
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: "--max_old_space_size=4096"
@@ -230,7 +230,6 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
-          args: --target ${{ matrix.target }}
 
   create-portable-windows:
     name: Create Windows Portable Version
