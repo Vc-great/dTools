@@ -45,11 +45,9 @@ jobs:
       - name: Install OpenSSL and setup cross-compilation (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
-          # 安装 OpenSSL 并使用 brew 提供的前缀路径
           brew install openssl@3 || true
           BREW_OPENSSL_PREFIX="$(brew --prefix openssl@3 || echo /usr/local/opt/openssl@3)"
 
-          # 如果目标是 x86_64，创建 /usr/local/opt 链接以兼容期望路径（有些构建脚本会查找这个路径）
           if [[ "${{ matrix.target }}" == "x86_64-apple-darwin" ]]; then
             sudo mkdir -p /usr/local/opt
             sudo ln -sf "${BREW_OPENSSL_PREFIX}" /usr/local/opt/openssl@3 || true
@@ -61,7 +59,6 @@ jobs:
             echo "CFLAGS_x86_64_apple_darwin=-I${BREW_OPENSSL_PREFIX}/include" >> $GITHUB_ENV
             echo "LDFLAGS_x86_64_apple_darwin=-L${BREW_OPENSSL_PREFIX}/lib" >> $GITHUB_ENV
           else
-            # arm64 (Apple Silicon) 使用 brew 提供的前缀
             echo "OPENSSL_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
             echo "OPENSSL_ROOT_DIR=${BREW_OPENSSL_PREFIX}" >> $GITHUB_ENV
             echo "PKG_CONFIG_PATH=${BREW_OPENSSL_PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
@@ -71,6 +68,8 @@ jobs:
 
           echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
           echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+          # 新增：强制链接 libssl 和 libcrypto
+          echo "OPENSSL_LIBS=-lssl -lcrypto" >> $GITHUB_ENV
         shell: bash
 
       - name: Rust setup
@@ -111,6 +110,7 @@ jobs:
           PKG_CONFIG_ALLOW_CROSS: ${{ env.PKG_CONFIG_ALLOW_CROSS }}
           CFLAGS_x86_64_apple_darwin: ${{ env.CFLAGS_x86_64_apple_darwin }}
           LDFLAGS_x86_64_apple_darwin: ${{ env.LDFLAGS_x86_64_apple_darwin }}
+          OPENSSL_LIBS: ${{ env.OPENSSL_LIBS }}
         with:
           tagName: "${{ inputs.version || 'latest' }}"
           releaseName: "dTools ${{ inputs.version || 'latest' }}"
@@ -179,6 +179,7 @@ jobs:
 
           echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
           echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+          echo "OPENSSL_LIBS=-lssl -lcrypto" >> $GITHUB_ENV
         shell: bash
 
       - name: Rust setup
@@ -221,6 +222,7 @@ jobs:
           PKG_CONFIG_ALLOW_CROSS: ${{ env.PKG_CONFIG_ALLOW_CROSS }}
           CFLAGS_x86_64_apple_darwin: ${{ env.CFLAGS_x86_64_apple_darwin }}
           LDFLAGS_x86_64_apple_darwin: ${{ env.LDFLAGS_x86_64_apple_darwin }}
+          OPENSSL_LIBS: ${{ env.OPENSSL_LIBS }}
         run: |
           cd src-tauri
           pnpm tauri build --target ${{ matrix.target }}
