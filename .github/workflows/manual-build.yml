@@ -114,7 +114,6 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
-          args: --target aarch64-apple-darwin ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 
   build-windows:
     name: Build Windows (${{ matrix.arch }})
