@@ -12,7 +12,8 @@ on:
           - release
           - debug
 
-permissions: write-all
+permissions:
+  contents: write
 
 env:
   CARGO_INCREMENTAL: 0
@@ -90,8 +91,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
-        run: pnpm run build
+      # 移除单独的前端构建步骤，让 Tauri 自己处理
+      # - name: Build frontend
+      #   run: pnpm run build
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -122,16 +124,17 @@ jobs:
             **下载说明:**
             
             ### macOS
-            - macOS Apple Silicon (M1/M2/M3): `*_aarch64.dmg`
+            - macOS Apple Silicon (M1/M2/M3): *_aarch64.dmg
             
             ### Windows
-            - Windows 64位: `*_x64-setup.exe`
-            - Windows ARM64: `*_arm64-setup.exe`
+            - Windows 64位: *_x64-setup.exe
+            - Windows ARM64: *_arm64-setup.exe
             
             **注意:** 这是手动构建版本，仅用于测试目的。
           releaseDraft: false
           prerelease: true
           tauriScript: pnpm
+          # 修复：只将目标和调试参数传递给 Tauri，不传递给前端构建
           args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 
       - name: Upload build artifacts
@@ -176,10 +179,10 @@ jobs:
           if ($x64_exe) {
             $x64_exe_path = Get-ChildItem -Path "./artifacts/x64" -Name $x64_exe -Recurse | Select-Object -First 1
             Copy-Item $x64_exe_path.FullName -Destination "./portable-x64/dTools.exe"
-            
+          
             # 创建便携版配置文件
             Set-Content -Path "./portable-x64/portable.txt" -Value "This is a portable version of dTools"
-            
+          
             # 压缩便携版
             Compress-Archive -Path "./portable-x64/*" -DestinationPath "dTools_${{ github.ref_name || 'manual' }}_x64-portable.zip"
           }
@@ -189,10 +192,10 @@ jobs:
           if ($arm64_exe) {
             $arm64_exe_path = Get-ChildItem -Path "./artifacts/arm64" -Name $arm64_exe -Recurse | Select-Object -First 1
             Copy-Item $arm64_exe_path.FullName -Destination "./portable-arm64/dTools.exe"
-            
+          
             # 创建便携版配置文件
             Set-Content -Path "./portable-arm64/portable.txt" -Value "This is a portable version of dTools"
-            
+          
             # 压缩便携版
             Compress-Archive -Path "./portable-arm64/*" -DestinationPath "dTools_${{ github.ref_name || 'manual' }}_arm64-portable.zip"
           }
