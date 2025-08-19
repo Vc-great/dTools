@@ -124,6 +124,7 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
+          args: --target ${{ matrix.target }}
 
   build-windows:
     name: Build Windows (${{ matrix.arch }})
@@ -233,6 +234,7 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
+          args: --target ${{ matrix.target }}
 
   create-portable-windows:
     name: Create Windows Portable Version
