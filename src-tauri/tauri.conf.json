@@ -52,12 +52,13 @@
   },
   "build": {
     "beforeDevCommand": "pnpm start",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
   "productName": "dTools",
   "mainBinaryName": "dTools",
-  "version": "../package.json",
+  "version": "0.1.0",
   "identifier": "com.dTools.app",
   "plugins": {
     "updater": {
