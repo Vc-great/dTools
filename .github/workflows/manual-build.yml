@@ -32,6 +32,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ####################
+  # macOS 多架构构建
+  ####################
   build-macos:
     name: Build macOS (Apple Silicon)
     runs-on: macos-latest
@@ -90,44 +93,36 @@ jobs:
         run: pnpm run build
 
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@dev
+        uses: tauri-apps/tauri-action@0.5.22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: "--max_old_space_size=4096"
-          # Apple signing (如果有Apple开发者证书，取消注释以下环境变量)
-          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          target: aarch64-apple-darwin
-          tagName: manual-build-${{ github.run_number }}
-          releaseName: "dTools Manual Build #${{ github.run_number }} - macOS"
+          projectPath: 'src-tauri'
+          tagName: manual-build-${{ github.run_number }}-${{ matrix.arch }}
+          releaseName: "dTools [${{ matrix.arch }}] Build #${{ github.run_number }}"
           releaseBody: |
-            ## dTools Manual Build #${{ github.run_number }} - macOS Apple Silicon
-            
             **Build Info:**
-            - Platform: macOS Apple Silicon (M1/M2/M3)
-            - Target: aarch64-apple-darwin
-            - Build Type: ${{ github.event.inputs.build_type }}
+            - Platform: macOS (${{ matrix.arch }})
+            - Target: ${{ matrix.target }}
+            - Type: ${{ github.event.inputs.build_type }}
             - Commit: ${{ github.sha }}
-            - Build Time: ${{ github.event.created_at }}
-            
-            **安装说明:**
-            1. 下载 `.dmg` 文件
-            2. 双击打开并将应用拖拽到 Applications 文件夹
-            3. 首次运行可能需要在系统偏好设置中允许运行
           draft: false
           prerelease: true
           tauriScript: pnpm
-          args: ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+          # 关键：将 --target 传给 tauri（cargo），并根据 build_type 决定是否加 --debug
+          args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+
+      - name: Print artifactPaths (debug)
+        run: |
+          echo "artifactPaths raw: ${{ steps.tauri-build-macos.outputs.artifactPaths }}"
+          # 尝试把 JSON 展开成多行（若系统有 jq）
+          echo "${{ steps.tauri-build-macos.outputs.artifactPaths }}" | jq -r '.[]' || true
 
   build-windows:
     name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
-    if: ${{ github.event.inputs.platforms == 'all' || github.event.inputs.platforms == 'windows-only' }}
+    if: ${{ github.event.inputs.platforms != 'macos-only' }}
     strategy:
       fail-fast: false
       matrix:
