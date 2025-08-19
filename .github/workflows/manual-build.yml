@@ -43,8 +43,6 @@ jobs:
 
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -105,7 +103,7 @@ jobs:
           # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          projectPath: 'src-tauri'
+          target: aarch64-apple-darwin
           tagName: manual-build-${{ github.run_number }}
           releaseName: "dTools Manual Build #${{ github.run_number }} - macOS"
           releaseBody: |
@@ -113,6 +111,7 @@ jobs:
             
             **Build Info:**
             - Platform: macOS Apple Silicon (M1/M2/M3)
+            - Target: aarch64-apple-darwin
             - Build Type: ${{ github.event.inputs.build_type }}
             - Commit: ${{ github.sha }}
             - Build Time: ${{ github.event.created_at }}
@@ -212,14 +211,17 @@ jobs:
           # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
+          target: ${{ matrix.target }}
           projectPath: 'src-tauri'
           tagName: manual-build-${{ github.run_number }}
           releaseName: "dTools Manual Build #${{ github.run_number }} - Windows ${{ matrix.arch }}"
+          artifactPaths: "src-tauri/target/${{ matrix.target }}/release/bundle/**/*"
           releaseBody: |
             ## dTools Manual Build #${{ github.run_number }} - Windows ${{ matrix.arch }}
             
             **Build Info:**
             - Platform: Windows ${{ matrix.arch }}
+            - Target: ${{ matrix.target }}
             - Build Type: ${{ github.event.inputs.build_type }}
             - Commit: ${{ github.sha }}
             - Build Time: ${{ github.event.created_at }}
@@ -234,6 +236,7 @@ jobs:
           draft: false
           prerelease: true
           tauriScript: pnpm
+          args: ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 
   create-portable-windows:
     name: Create Windows Portable Version
