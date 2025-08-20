@@ -93,7 +93,7 @@ jobs:
         run: pnpm run build
 
       - name: Build Tauri App
-        uses: tauri-apps/tauri-action@0.5.22
+        uses: tauri-apps/tauri-action@v0.5.22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: "--max_old_space_size=4096"
