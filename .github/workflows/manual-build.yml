@@ -107,11 +107,11 @@ jobs:
             - Target: ${{ matrix.target }}
             - Type: ${{ github.event.inputs.build_type }}
             - Commit: ${{ github.sha }}
-          draft: false
+          releaseDraft: false
           prerelease: true
           tauriScript: cargo
           # 关键：将 --target 传给 tauri（cargo），并根据 build_type 决定是否加 --debug
-          args: build ${{ github.event.inputs.build_type == 'debug' && '--debug' || '--release' }} --target ${{ matrix.target }}
+          args: ${{ github.event.inputs.build_type == 'debug' && '--debug' || '--release' }} --target ${{ matrix.target }}
 
       - name: Print artifactPaths (debug)
         run: |
@@ -212,10 +212,10 @@ jobs:
             - Target: ${{ matrix.target }}
             - Type: ${{ github.event.inputs.build_type }}
             - Commit: ${{ github.sha }}
-          draft: false
+          releaseDraft: false
           prerelease: true
-          tauriScript: pnpm
-          args: ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+          tauriScript: cargo
+          args: ${{ github.event.inputs.build_type == 'debug' && '--debug' || '--release' }} --target ${{ matrix.target }}
 
   create-portable-windows:
     name: Create Windows Portable Version
