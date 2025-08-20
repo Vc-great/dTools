@@ -112,7 +112,7 @@ jobs:
             - Commit: ${{ github.sha }}
           releaseDraft: false
           prerelease: true
-          tauriScript: pnpm
+          tauriScript: pnpm run rls
           # 始终把 --target 传给 cargo；如果是 debug 加上 --debug
           args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 

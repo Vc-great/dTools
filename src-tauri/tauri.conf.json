@@ -59,7 +59,7 @@
   "productName": "dTools",
   "mainBinaryName": "dTools",
   "version": "0.1.0",
-  "identifier": "com.dTools.app",
+  "identifier": "com.dTools",
   "plugins": {
     "updater": {
       "endpoints": [],
