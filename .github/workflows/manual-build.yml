@@ -109,9 +109,9 @@ jobs:
             - Commit: ${{ github.sha }}
           draft: false
           prerelease: true
-          tauriScript: pnpm
+          tauriScript: cargo
           # 关键：将 --target 传给 tauri（cargo），并根据 build_type 决定是否加 --debug
-          args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+          args: build ${{ github.event.inputs.build_type == 'debug' && '--debug' || '--release' }} --target ${{ matrix.target }}
 
       - name: Print artifactPaths (debug)
         run: |
