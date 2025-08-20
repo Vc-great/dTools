@@ -21,14 +21,16 @@ on:
           - macos-only
           - windows-only
 
-permissions: write-all
+# 合法的 permissions 写法（避免非法值）
+permissions:
+  contents: write
 
 env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
 
 concurrency:
-  group: "${{ github.workflow }} - ${{ github.head_ref || github.ref }}"
+  group: ${{ github.workflow }} - ${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -48,28 +50,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Rust Stable
+      - name: Install Rust Stable (toolchain)
         uses: dtolnay/rust-toolchain@stable
         with:
+          # 安装指定目标，以便 cargo 可以为 macOS aarch64 编译
           targets: ${{ matrix.target }}
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          cache-all-crates: true
-          key: ${{ matrix.target }}
+      - name: Verify rust is available
+        run: |
+          rustc --version
+          cargo --version
+        shell: bash
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
-          run_install: false
+      - name: Enable Corepack & pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+          pnpm -v
+        shell: bash
 
       - name: Get pnpm store directory
         shell: bash
@@ -86,11 +89,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        shell: bash
 
       - name: Build frontend
         run: pnpm run build
+        shell: bash
 
-      - name: Build Tauri App
+      - name: Build Tauri App (macOS)
+        id: tauri-build-macos
         uses: tauri-apps/tauri-action@v0.5.22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -107,15 +113,18 @@ jobs:
           releaseDraft: false
           prerelease: true
           tauriScript: pnpm
-          # 关键：将 --target 传给 tauri（cargo），并根据 build_type 决定是否加 --debug
+          # 始终把 --target 传给 cargo；如果是 debug 加上 --debug
           args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 
       - name: Print artifactPaths (debug)
         run: |
           echo "artifactPaths raw: ${{ steps.tauri-build-macos.outputs.artifactPaths }}"
-          # 尝试把 JSON 展开成多行（若系统有 jq）
           echo "${{ steps.tauri-build-macos.outputs.artifactPaths }}" | jq -r '.[]' || true
+        shell: bash
 
+  ####################
+  # Windows 构建
+  ####################
   build-windows:
     name: Build Windows (${{ matrix.arch }})
     runs-on: windows-latest
@@ -133,35 +142,35 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Rust Stable
+      - name: Install Rust Stable (toolchain)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          cache-all-crates: true
-          key: ${{ matrix.target }}
+      - name: Verify rust is available (Windows)
+        run: |
+          rustc --version
+          cargo --version
+        shell: bash
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Setup Windows build environment
+      - name: Setup Windows build environment (PowerShell)
+        shell: pwsh
         run: |
-          # 设置环境变量使用 Windows 原生 SSL
-          echo "OPENSSL_NO_VENDOR=1" >> $GITHUB_ENV
-          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
-        shell: bash
+          # 使用系统 OpenSSL（如果需要）
+          echo "OPENSSL_NO_VENDOR=1" >> $env:GITHUB_ENV
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $env:GITHUB_ENV
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
-          run_install: false
+      - name: Enable Corepack & pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+          pnpm -v
+        shell: bash
 
       - name: Get pnpm store directory
         shell: bash
@@ -171,7 +180,6 @@ jobs:
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
-          projectPath: 'src-tauri'
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
@@ -179,22 +187,24 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        shell: bash
 
       - name: Build frontend
         run: pnpm run build
+        shell: bash
 
-      - name: Verify frontend build
+      - name: Verify frontend build (PowerShell)
+        shell: pwsh
         run: |
           if (!(Test-Path "dist")) {
-            Write-Host "❌ Frontend build failed - dist directory not found" -ForegroundColor Red
+            Write-Host "❌ Frontend build failed - dist directory not found"
             exit 1
           }
-          Write-Host "✅ Frontend build successful - dist directory exists" -ForegroundColor Green
+          Write-Host "✅ Frontend build successful - dist directory exists"
           Get-ChildItem dist -Force
-        shell: powershell
 
-      - name: Build Tauri App
-        id: build
+      - name: Build Tauri App (Windows)
+        id: tauri-build-windows
         uses: tauri-apps/tauri-action@v0.5.22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -205,14 +215,14 @@ jobs:
           releaseName: "dTools [${{ matrix.arch }}] Build #${{ github.run_number }}"
           releaseBody: |
             **Build Info:**
-            - Platform: macOS (${{ matrix.arch }})
+            - Platform: Windows (${{ matrix.arch }})
             - Target: ${{ matrix.target }}
             - Type: ${{ github.event.inputs.build_type }}
             - Commit: ${{ github.sha }}
           releaseDraft: false
           prerelease: true
           tauriScript: pnpm
-          args: ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
+          args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 
   create-portable-windows:
     name: Create Windows Portable Version
@@ -224,7 +234,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download Windows x64 artifacts
+      - name: Download Windows artifacts (if any)
         uses: actions/download-artifact@v4
         with:
           name: artifact
@@ -232,16 +242,12 @@ jobs:
         continue-on-error: true
 
       - name: Create Portable Packages
+        shell: powershell
         run: |
-          # 创建便携版目录
           New-Item -ItemType Directory -Force -Path "portable-x64", "portable-arm64"
-          
-          # 查找构建产物
           $buildPath = if ("${{ github.event.inputs.build_type }}" -eq "debug") { "debug" } else { "release" }
-          
-          # 寻找可执行文件
+
           $exeFiles = Get-ChildItem -Path "src-tauri/target" -Name "*.exe" -Recurse | Where-Object { $_ -match "dTools|app" -and $_ -notmatch "setup|install|deps" }
-          
           foreach ($exe in $exeFiles) {
             $fullPath = Get-ChildItem -Path "src-tauri/target" -Name $exe -Recurse | Select-Object -First 1
             if ($fullPath) {
@@ -252,41 +258,21 @@ jobs:
               }
             }
           }
-          
-          # 创建便携版配置文件和说明
+
           $readmeContent = @"
           # dTools 便携版
-
           这是 dTools 的便携版本，无需安装即可使用。
-
-          ## 使用方法
-          1. 解压所有文件到任意目录
-          2. 双击 dTools.exe 运行程序
-          3. 程序设置和数据将保存在同级目录下
-
-          ## 系统要求
-          - Windows 10 或更高版本
-
-          ## 注意事项
-          - 首次运行可能会被 Windows Defender 拦截，请选择"仍要运行"
-          - 如遇到问题，请尝试以管理员身份运行
           "@
-          
+
           if (Test-Path "./portable-x64/dTools.exe") {
             Set-Content -Path "./portable-x64/README.txt" -Value $readmeContent -Encoding UTF8
-            Set-Content -Path "./portable-x64/portable.flag" -Value "portable" -Encoding UTF8
             Compress-Archive -Path "./portable-x64/*" -DestinationPath "dTools_manual-build-${{ github.run_number }}_x64-portable.zip" -Force
           }
-          
           if (Test-Path "./portable-arm64/dTools.exe") {
             Set-Content -Path "./portable-arm64/README.txt" -Value $readmeContent -Encoding UTF8
-            Set-Content -Path "./portable-arm64/portable.flag" -Value "portable" -Encoding UTF8
             Compress-Archive -Path "./portable-arm64/*" -DestinationPath "dTools_manual-build-${{ github.run_number }}_arm64-portable.zip" -Force
           }
-          
-          # 列出创建的文件
           Get-ChildItem -Name "*.zip"
-        shell: powershell
 
       - name: Upload portable packages to release
         uses: softprops/action-gh-release@v2
@@ -311,7 +297,6 @@ jobs:
     needs: [build-macos, build-windows, create-portable-windows]
     runs-on: ubuntu-latest
     if: always()
-
     steps:
       - name: Update Release Body
         uses: softprops/action-gh-release@v2
@@ -320,41 +305,11 @@ jobs:
           name: "dTools Manual Build #${{ github.run_number }}"
           body: |
             # 🛠️ dTools Manual Build #${{ github.run_number }}
-            
             **构建信息:**
             - 构建类型: ${{ github.event.inputs.build_type }}
             - 平台选择: ${{ github.event.inputs.platforms }}
             - 提交哈希: ${{ github.sha }}
             - 构建时间: ${{ github.event.created_at }}
-            
-            ## 📥 下载说明
-            
-            ### macOS
-            - **macOS Apple Silicon (M1/M2/M3)**: `*_aarch64.dmg`
-              - 下载后双击打开，将应用拖拽到 Applications 文件夹
-              - 首次运行可能需要在系统偏好设置中允许运行
-            
-            ### Windows
-            - **Windows 64位安装包**: `*_x64-setup.exe` 或 `*_x64.msi`
-            - **Windows ARM64安装包**: `*_arm64-setup.exe` 或 `*_arm64.msi`
-            - **Windows 64位便携版**: `*_x64-portable.zip`
-            - **Windows ARM64便携版**: `*_arm64-portable.zip`
-            
-            **便携版使用方法:**
-            1. 下载对应的便携版压缩包
-            2. 解压到任意目录
-            3. 双击 `dTools.exe` 直接运行
-            4. 无需安装，设置数据保存在程序目录
-            
-            ## ⚠️ 注意事项
-            - 这是手动构建版本，仅用于测试和开发目的
-            - 未经过代码签名，可能会被操作系统安全软件拦截
-            - Windows 用户首次运行可能需要选择"仍要运行"
-            - 如遇问题请提交 Issue 反馈
-            
-            ## 🔄 系统要求
-            - **macOS**: macOS 10.15+ (Apple Silicon)
-            - **Windows**: Windows 10+ (x64 或 ARM64)
           draft: false
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
