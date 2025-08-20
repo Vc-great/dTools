@@ -52,7 +52,7 @@
   },
   "build": {
     "beforeDevCommand": "pnpm start",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build:web",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
