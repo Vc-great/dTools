@@ -147,6 +147,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          save-if: false
+
       - name: Verify rust is available (Windows)
         run: |
           rustc --version
@@ -165,12 +171,10 @@ jobs:
           echo "OPENSSL_NO_VENDOR=1" >> $env:GITHUB_ENV
           echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $env:GITHUB_ENV
 
-      - name: Enable Corepack & pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
-          pnpm -v
-        shell: bash
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Get pnpm store directory
         shell: bash
@@ -204,13 +208,12 @@ jobs:
           Get-ChildItem dist -Force
 
       - name: Build Tauri App (Windows)
-        id: tauri-build-windows
+        id: tauri-build
         uses: tauri-apps/tauri-action@v0.5.22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: "--max_old_space_size=4096"
         with:
-          projectPath: 'src-tauri'
           tagName: manual-build-${{ github.run_number }}-${{ matrix.arch }}
           releaseName: "dTools [${{ matrix.arch }}] Build #${{ github.run_number }}"
           releaseBody: |
@@ -224,77 +227,100 @@ jobs:
           tauriScript: pnpm
           args: --target ${{ matrix.target }} ${{ github.event.inputs.build_type == 'debug' && '--debug' || '' }}
 
-  create-portable-windows:
-    name: Create Windows Portable Version
-    needs: build-windows
-    runs-on: windows-latest
-    if: ${{ always() && (needs.build-windows.result == 'success') && (github.event.inputs.platforms == 'all' || github.event.inputs.platforms == 'windows-only') }}
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Windows artifacts (if any)
-        uses: actions/download-artifact@v4
-        with:
-          name: artifact
-          path: ./artifacts
-        continue-on-error: true
-
-      - name: Create Portable Packages
-        shell: powershell
+      - name: Create Portable Package
+        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "portable-x64", "portable-arm64"
-          $buildPath = if ("${{ github.event.inputs.build_type }}" -eq "debug") { "debug" } else { "release" }
-
-          $exeFiles = Get-ChildItem -Path "src-tauri/target" -Name "*.exe" -Recurse | Where-Object { $_ -match "dTools|app" -and $_ -notmatch "setup|install|deps" }
-          foreach ($exe in $exeFiles) {
-            $fullPath = Get-ChildItem -Path "src-tauri/target" -Name $exe -Recurse | Select-Object -First 1
-            if ($fullPath) {
-              if ($fullPath.FullName -match "x86_64-pc-windows-msvc") {
-                Copy-Item $fullPath.FullName -Destination "./portable-x64/dTools.exe" -ErrorAction SilentlyContinue
-              } elseif ($fullPath.FullName -match "aarch64-pc-windows-msvc") {
-                Copy-Item $fullPath.FullName -Destination "./portable-arm64/dTools.exe" -ErrorAction SilentlyContinue
-              }
+          # 获取应用版本和构建路径
+          $buildType = if ("${{ github.event.inputs.build_type }}" -eq "debug") { "debug" } else { "release" }
+          $targetPath = "src-tauri/target/${{ matrix.target }}/$buildType"
+          
+          Write-Host "=== Build Information ==="
+          Write-Host "Target: ${{ matrix.target }}"
+          Write-Host "Architecture: ${{ matrix.arch }}"
+          Write-Host "Build Type: $buildType"
+          Write-Host "Target Path: $targetPath"
+          
+          # 创建便携版目录
+          $portableDir = "portable-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path $portableDir
+          
+          # 查找主程序exe文件
+          $exePath = "$targetPath/dTools.exe"
+          if (!(Test-Path $exePath)) {
+            $exePath = "$targetPath/app.exe"
+          }
+          
+          if (Test-Path $exePath) {
+            Write-Host "✅ Found executable: $exePath"
+            Copy-Item $exePath -Destination "$portableDir/dTools.exe" -Force
+            
+            # 获取文件大小
+            $fileSize = (Get-Item $exePath).Length / 1MB
+            Write-Host "Executable size: ${fileSize:N2} MB"
+          } else {
+            Write-Host "❌ No executable found at $exePath"
+            Write-Host "Listing target directory contents:"
+            if (Test-Path $targetPath) {
+              Get-ChildItem $targetPath -File | Format-Table Name, Length
             }
+            exit 1
           }
-
+          
+          # 创建README文件
           $readmeContent = @"
-          # dTools 便携版
-          这是 dTools 的便携版本，无需安装即可使用。
-          "@
+# dTools 便携版
 
-          if (Test-Path "./portable-x64/dTools.exe") {
-            Set-Content -Path "./portable-x64/README.txt" -Value $readmeContent -Encoding UTF8
-            Compress-Archive -Path "./portable-x64/*" -DestinationPath "dTools_manual-build-${{ github.run_number }}_x64-portable.zip" -Force
-          }
-          if (Test-Path "./portable-arm64/dTools.exe") {
-            Set-Content -Path "./portable-arm64/README.txt" -Value $readmeContent -Encoding UTF8
-            Compress-Archive -Path "./portable-arm64/*" -DestinationPath "dTools_manual-build-${{ github.run_number }}_arm64-portable.zip" -Force
-          }
-          Get-ChildItem -Name "*.zip"
+这是 dTools 的便携版本，无需安装即可使用。
 
-      - name: Upload portable packages to release
+## 使用方法
+直接双击 dTools.exe 即可运行。
+
+## 系统要求
+- Windows 10/11 (${{ matrix.arch }})
+- WebView2 Runtime (通常系统已预装)
+
+## 构建信息
+- 构建编号: ${{ github.run_number }}
+- 提交哈希: ${{ github.sha }}
+- 构建类型: ${{ github.event.inputs.build_type }}
+- 架构: ${{ matrix.arch }}
+- 构建时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+"@
+          
+          Set-Content -Path "$portableDir/README.txt" -Value $readmeContent -Encoding UTF8
+          
+          # 创建压缩包
+          $zipName = "dTools_manual-build-${{ github.run_number }}_${{ matrix.arch }}-portable.zip"
+          Compress-Archive -Path "$portableDir/*" -DestinationPath $zipName -Force
+          
+          if (Test-Path $zipName) {
+            $zipSize = (Get-Item $zipName).Length / 1MB
+            Write-Host "✅ Created portable package: $zipName (${zipSize:N2} MB)"
+          } else {
+            Write-Host "❌ Failed to create portable package"
+            exit 1
+          }
+
+      - name: Upload Portable Package to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: manual-build-${{ github.run_number }}
+          tag_name: manual-build-${{ github.run_number }}-${{ matrix.arch }}
           files: |
-            dTools_manual-build-${{ github.run_number }}_*-portable.zip
+            dTools_manual-build-${{ github.run_number }}_${{ matrix.arch }}-portable.zip
           token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      - name: Upload portable artifacts
+      - name: Upload Portable Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-portable-packages
+          name: windows-${{ matrix.arch }}-portable
           path: |
-            dTools_manual-build-${{ github.run_number }}_*-portable.zip
+            dTools_manual-build-${{ github.run_number }}_${{ matrix.arch }}-portable.zip
           retention-days: 30
-        continue-on-error: true
 
   finalize-release:
     name: Finalize Release
-    needs: [build-macos, build-windows, create-portable-windows]
+    needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     if: always()
     steps:
