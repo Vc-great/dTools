@@ -452,37 +452,129 @@ impl DeployService {
         channel.exec(command)?;
 
         let mut output = String::new();
-        let mut buffer = [0; 1024];
+        let mut stdout_buffer = [0; 4096]; // 增大缓冲区
+        let mut stderr_buffer = [0; 4096];
+        let mut line_buffer = String::new();
+        let mut stderr_line_buffer = String::new();
 
+        // 设置非阻塞模式以便同时读取stdout和stderr
         loop {
-            match channel.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let chunk = String::from_utf8_lossy(&buffer[..n]);
-                    output.push_str(&chunk);
+            let mut has_data = false;
 
-                    // 实时发送输出到前端
-                    for line in chunk.lines() {
-                        if !line.trim().is_empty() {
-                            self.emit_log("info", &format!("STDOUT: {}", line.trim()), Some(step)).await;
+            // 尝试读取标准输出
+            match channel.read(&mut stdout_buffer) {
+                Ok(0) => {
+                    // stdout结束，但继续检查stderr
+                }
+                Ok(n) => {
+                    has_data = true;
+                    let chunk = String::from_utf8_lossy(&stdout_buffer[..n]);
+                    output.push_str(&chunk);
+                    line_buffer.push_str(&chunk);
+
+                    // 处理完整的行
+                    while let Some(newline_pos) = line_buffer.find('\n') {
+                        let line = line_buffer[..newline_pos].trim();
+                        if !line.is_empty() {
+                            // 为Docker构建输出添加特殊处理
+                            if command.contains("docker build") {
+                                if line.starts_with("Step ") || line.starts_with("---> ") ||
+                                   line.contains("Successfully built") || line.contains("Successfully tagged") ||
+                                   line.contains("COPY") || line.contains("RUN") || line.contains("FROM") ||
+                                   line.contains("WORKDIR") || line.contains("EXPOSE") || line.contains("CMD") {
+                                    self.emit_log("info", &format!("🐳 {}", line), Some(step)).await;
+                                } else {
+                                    self.emit_log("info", &format!("   {}", line), Some(step)).await;
+                                }
+                            } else {
+                                self.emit_log("info", &format!("📤 {}", line), Some(step)).await;
+                            }
                         }
+                        line_buffer = line_buffer[newline_pos + 1..].to_string();
                     }
                 }
-                Err(_) => break,
+                Err(_) => {
+                    // 如果是EAGAIN（会阻塞），继续尝试stderr
+                }
             }
 
+            // 尝试读取标准错误输出
+            match channel.stderr().read(&mut stderr_buffer) {
+                Ok(0) => {
+                    // stderr结束
+                }
+                Ok(n) => {
+                    has_data = true;
+                    let chunk = String::from_utf8_lossy(&stderr_buffer[..n]);
+                    stderr_line_buffer.push_str(&chunk);
+
+                    // 处理stderr的完整行
+                    while let Some(newline_pos) = stderr_line_buffer.find('\n') {
+                        let line = stderr_line_buffer[..newline_pos].trim();
+                        if !line.is_empty() {
+                            // 过滤掉不重要的警告
+                            if line.contains("LIBARCHIVE.xattr.com.apple.provenance") ||
+                               line.contains("tar: Ignoring unknown extended header keyword") {
+                                // 静默忽略这些macOS特定的警告
+                                continue;
+                            }
+
+                            // Docker构建的stderr通常包含重要信息
+                            if command.contains("docker build") {
+                                self.emit_log("warning", &format!("🔧 {}", line), Some(step)).await;
+                            } else {
+                                self.emit_log("warning", &format!("⚠️  {}", line), Some(step)).await;
+                            }
+                        }
+                        stderr_line_buffer = stderr_line_buffer[newline_pos + 1..].to_string();
+                    }
+                }
+                Err(_) => {
+                    // stderr读取错误或无数据
+                }
+            }
+
+            // 检查通道是否已关闭
             if channel.eof() {
                 break;
             }
+
+            // 如果没有数据，短暂休眠避免CPU占用过高
+            if !has_data {
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            }
+        }
+
+        // 处理剩余的缓冲区内容
+        if !line_buffer.trim().is_empty() {
+            let remaining = line_buffer.trim();
+            if command.contains("docker build") {
+                self.emit_log("info", &format!("🐳 {}", remaining), Some(step)).await;
+            } else {
+                self.emit_log("info", &format!("📤 {}", remaining), Some(step)).await;
+            }
+        }
+
+        if !stderr_line_buffer.trim().is_empty() {
+            let remaining = stderr_line_buffer.trim();
+            self.emit_log("warning", &format!("⚠️  {}", remaining), Some(step)).await;
         }
 
         channel.wait_close()?;
         let exit_status = channel.exit_status()?;
 
         if exit_status != 0 {
-            let mut error_output = String::new();
-            let _ = channel.stderr().read_to_string(&mut error_output);
-            return Err(anyhow::anyhow!("命令执行失败: {}", error_output));
+            let error_msg = format!("命令执行失败 (退出码: {})", exit_status);
+            self.emit_log("error", &error_msg, Some(step)).await;
+            return Err(anyhow::anyhow!("{}", error_msg));
+        }
+
+        // 命令成功完成的日志
+        let output_lines = output.lines().count();
+        if command.contains("docker build") {
+            self.emit_log("success", &format!("🎉 Docker镜像构建完成，共处理 {} 行输出", output_lines), Some(step)).await;
+        } else {
+            self.emit_log("success", &format!("✅ 命令执行完成，共输出 {} 行", output_lines), Some(step)).await;
         }
 
         Ok(output)
