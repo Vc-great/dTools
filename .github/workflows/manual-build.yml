@@ -267,25 +267,7 @@ jobs:
           }
           
           # 创建README文件
-          $readmeContent = @"
-# dTools 便携版
-
-这是 dTools 的便携版本，无需安装即可使用。
-
-## 使用方法
-直接双击 dTools.exe 即可运行。
-
-## 系统要求
-- Windows 10/11 (${{ matrix.arch }})
-- WebView2 Runtime (通常系统已预装)
-
-## 构建信息
-- 构建编号: ${{ github.run_number }}
-- 提交哈希: ${{ github.sha }}
-- 构建类型: ${{ github.event.inputs.build_type }}
-- 架构: ${{ matrix.arch }}
-- 构建时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-"@
+          $readmeContent = "# dTools 便携版`n`n这是 dTools 的便携版本，无需安装即可使用。`n`n## 使用方法`n直接双击 dTools.exe 即可运行。`n`n## 系统要求`n- Windows 10/11 (${{ matrix.arch }})`n- WebView2 Runtime (通常系统已预装)`n`n## 构建信息`n- 构建编号: ${{ github.run_number }}`n- 提交哈希: ${{ github.sha }}`n- 构建类型: ${{ github.event.inputs.build_type }}`n- 架构: ${{ matrix.arch }}`n- 构建时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
           
           Set-Content -Path "$portableDir/README.txt" -Value $readmeContent -Encoding UTF8
           
