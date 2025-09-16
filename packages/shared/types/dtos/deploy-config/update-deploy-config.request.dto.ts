@@ -1,0 +1,13 @@
+import type { RefType } from "@shared/types/dtos/deploy-config/deploy-config.enum.ts";
+
+export type UpdateDeployConfigRequestDto = {
+	id: string;
+	name: string;
+	projectId: string;
+	gitAccountId: string;
+	vmAccountId: string;
+	repoUrl: string;
+	refType: RefType;
+	refName: string;
+	deployScript: string;
+};

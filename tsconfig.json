@@ -1,0 +1,32 @@
+{
+	"compilerOptions": {
+		"typeRoots": ["node_modules/@types"],
+		"types": [
+			"node",
+			"vite/client",
+			"react",
+			"vitest/globals",
+			"node_modules/@types"
+		],
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"allowJs": false,
+		"strict": true,
+		"declaration": true,
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"paths": {
+			"@main/*": ["./packages/main/src/*"],
+			"@renderer/*": ["./packages/renderer/src/*"],
+			"@preload/*": ["./packages/preload/*"],
+			"@app/electron-versions": ["./packages/electron-versions"],
+			"@shared/*": ["./packages/shared/*"]
+		},
+		"jsx": "react-jsx"
+	},
+	"include": ["./packages/**/*.ts", "./packages/**/*.tsx"],
+	"exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
+}

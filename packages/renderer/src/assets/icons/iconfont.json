@@ -1,0 +1,16 @@
+{
+  "id": "5034551",
+  "name": "dTools",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "7736106",
+      "name": "git",
+      "font_class": "git",
+      "unicode": "e8f0",
+      "unicode_decimal": 59632
+    }
+  ]
+}
