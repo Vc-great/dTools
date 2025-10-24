@@ -26,7 +26,7 @@
 		"@types/archiver": "^6.0.3",
 		"@types/fs-extra": "^11.0.4",
 		"@types/lodash-es": "^4.17.12",
-		"@types/node": "24.3.1",
+		"@types/node": "24.9.1",
 		"@types/ssh2": "^1.15.5",
 		"create-vite": "7.1.1",
 		"electron": "38.1.0",
