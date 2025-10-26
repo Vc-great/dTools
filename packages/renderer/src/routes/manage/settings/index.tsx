@@ -1,4 +1,4 @@
-import { Folder, Settings as SettingsIcon } from "@mui/icons-material";
+import { Folder, Info, Settings as SettingsIcon } from "@mui/icons-material";
 import {
 	Box,
 	Button,
@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { tryit } from "radash";
 import { useState } from "react";
+import toast from "react-hot-toast";
 import SimpleBar from "simplebar-react";
 
 function Settings() {
@@ -36,8 +37,8 @@ function Settings() {
 			return updateDataFolderPathService(data);
 		},
 		onSuccess(data) {
-			console.log("-> data", data);
 			queryClient.invalidateQueries({ queryKey: ["settings"] });
+			toast.success(data.message);
 		},
 		onError(error) {
 			console.error("Failed to update data folder path:", error);
@@ -71,6 +72,51 @@ function Settings() {
 				<SimpleBar style={{ height: "100%" }}>
 					<Box sx={{ p: 3 }}>
 						<Grid container spacing={2}>
+							{/* 版本信息 */}
+							<Grid size={12}>
+								<Card>
+									<CardContent>
+										<Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+											<Info sx={{ mr: 1, color: "primary.main" }} />
+											<Typography variant="h6">{"Application Info"}</Typography>
+										</Box>
+										<Box
+											sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+										>
+											<Box
+												sx={{
+													display: "flex",
+													justifyContent: "space-between",
+												}}
+											>
+												<Typography variant="body2" color="text.secondary">
+													{"Version:"}
+												</Typography>
+												<Typography variant="body2" fontWeight="medium">
+													{settingData?.version || "N/A"}
+												</Typography>
+											</Box>
+											<Box
+												sx={{
+													display: "flex",
+													justifyContent: "space-between",
+												}}
+											>
+												<Typography variant="body2" color="text.secondary">
+													{"Last Modified:"}
+												</Typography>
+												<Typography variant="body2" fontWeight="medium">
+													{settingData?.lastModified
+														? new Date(
+																settingData.lastModified,
+															).toLocaleString()
+														: "N/A"}
+												</Typography>
+											</Box>
+										</Box>
+									</CardContent>
+								</Card>
+							</Grid>
 							{/* 文件管理设置 */}
 							<Grid size={12}>
 								<Card>

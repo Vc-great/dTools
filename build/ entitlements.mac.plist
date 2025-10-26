@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <key>NSUserNotificationUsageDescription</key>
+  <string>App需要发送通知来提醒用户重要信息</string>
+</dict>
+</plist>

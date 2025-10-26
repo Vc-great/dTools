@@ -10,7 +10,10 @@ import { hardwareAccelerationMode } from "./modules/HardwareAccelerationModule.j
 import { disallowMultipleAppInstance } from "./modules/SingleInstanceApp.js";
 import { createWindowManagerModule } from "./modules/WindowManager.js";
 import "@shared/utils/dayjs-setup.js";
+import { app } from "electron";
 export async function initApp(initConfig: AppInitConfig) {
+	app.setAppUserModelId("com.dTools");
+
 	const moduleRunner = createModuleRunner()
 		.init(
 			createWindowManagerModule({

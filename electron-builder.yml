@@ -13,19 +13,30 @@ asarUnpack:
   - resources/**
 win:
   executableName: dTools
-  icon: resources/icon.ico
+  icon: resources/icons/win/icon.ico
   target:
-    - target: nsis
+    - target: nsis    # Windows 安装程序
       arch:
         - x64          # 普通 Windows 电脑
         - arm64        # ARM Windows 设备
+        - ia32         # x86 32位系统
+    - target: portable # 便携版
+      arch:
+        - x64
+        - ia32
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  # NSIS 安装程序文件名模板
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+
+portable:
+  # 便携包文件名模板（portable target 使用此配置）
+  artifactName: ${productName}-Portable-${version}-${arch}.${ext}
+
 mac:
-  icon: resources/icon.icns
+  icon: resources/icons/mac/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
@@ -34,17 +45,7 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${productName}-${version}.${ext}
-linux:
-  icon: resources/icon.png
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 npmRebuild: false
 publish:
   provider: generic

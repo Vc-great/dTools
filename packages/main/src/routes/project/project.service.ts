@@ -131,7 +131,10 @@ export class ProjectService {
 	async unlinkDeployConfigToProject(
 		deployConfigId: string,
 	): Promise<ProjectResponseDto> {
-		const existingProject = projectStore.store.projects.find((proj) => proj.deployConfigs.some((deploy) => deploy.deployConfigId === deployConfigId);
+		const existingProject = projectStore.store.projects.find((proj) =>
+			proj.deployConfigs.some(
+				(deploy) => deploy.deployConfigId === deployConfigId,
+			),
 		);
 
 		if (!existingProject) {

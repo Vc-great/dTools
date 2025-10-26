@@ -28,7 +28,7 @@ interface NavigationItem {
 
 const SIDEBAR_WIDTH = 60; // 调整为仅图标宽度
 const SIDEBAR_COLLAPSED_WIDTH = 60;
-const SIDEBAR_HEADER_HEIGHT = 88;
+const SIDEBAR_HEADER_HEIGHT = 73;
 
 export default function Sidebar() {
 	const theme = useTheme();
