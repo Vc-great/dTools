@@ -111,7 +111,7 @@ class WindowManager implements AppModule {
 			minWidth: 1280,
 			minHeight: 720,
 			icon: isWindows()
-				? path.resolve(process.cwd(), "resources", "icon.ico")
+				? path.resolve(process.cwd(), "resources/icons/win", "icon.ico")
 				: "",
 			show: false, // 在 ready-to-show 时由 restoreOrCreateWindow 控制显示
 			webPreferences: {
@@ -250,7 +250,7 @@ class WindowManager implements AppModule {
 		this.#tray = new ElectronTray(
 			isMac()
 				? trayImage
-				: path.resolve(process.cwd(), "resources", "icon.ico"),
+				: path.resolve(process.cwd(), "resources/icons/win", "icon.ico"),
 		);
 
 		const contextMenu = Menu.buildFromTemplate([

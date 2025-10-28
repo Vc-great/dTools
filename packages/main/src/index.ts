@@ -12,7 +12,7 @@ import { createWindowManagerModule } from "./modules/WindowManager.js";
 import "@shared/utils/dayjs-setup.js";
 import { app } from "electron";
 export async function initApp(initConfig: AppInitConfig) {
-	app.setAppUserModelId("com.dTools");
+	app.setAppUserModelId("com.vitamin.dTools");
 
 	const moduleRunner = createModuleRunner()
 		.init(
