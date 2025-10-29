@@ -89,7 +89,6 @@ const GitRepositoryForm: React.FC<GitRepositoryFormProps> = (props) => {
 		if ("id" in formData && formData.id) {
 			updateGitAuthenticationMutate(formData);
 		} else {
-			console.log("-> formData", formData);
 			createGitAuthenticationMutate(formData);
 		}
 	};
