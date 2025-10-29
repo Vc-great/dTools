@@ -16,6 +16,8 @@ const createIPCHandler = require("trpc-electron/main").createIPCHandler;
 
 import { appRouter } from "@main/routes";
 import { isMac, isWindows } from "@main/utils/is-platform.ts";
+import { rootPath } from "@main/utils/root-path.ts";
+import fse from "fs-extra";
 
 /**
  * WindowManager
@@ -61,7 +63,7 @@ class WindowManager implements AppModule {
 		);
 
 		await app.whenReady();
-		// 创建托盘（单例）
+
 		this.createTray();
 		this.setAppIcons();
 
@@ -83,11 +85,7 @@ class WindowManager implements AppModule {
 	}
 
 	setAppIcons() {
-		const iconPath = path.resolve(
-			process.cwd(),
-			"resources/icons/png",
-			"icon.png",
-		);
+		const iconPath = path.resolve(rootPath, "resources/icons/png", "icon.png");
 		if (!iconPath) return;
 
 		try {
@@ -111,7 +109,7 @@ class WindowManager implements AppModule {
 			minWidth: 1280,
 			minHeight: 720,
 			icon: isWindows()
-				? path.resolve(process.cwd(), "resources/icons/win", "icon.ico")
+				? path.resolve(rootPath, "resources/icons/win", "icon.ico")
 				: "",
 			show: false, // 在 ready-to-show 时由 restoreOrCreateWindow 控制显示
 			webPreferences: {
@@ -236,7 +234,7 @@ class WindowManager implements AppModule {
 
 		const trayImage = nativeImage
 			.createFromPath(
-				path.resolve(process.cwd(), "resources/icons/mac", "trayTemplate.png"),
+				path.resolve(rootPath, "resources/icons/mac", "trayTemplate.png"),
 			)
 			.resize({
 				width: 16,
@@ -250,7 +248,7 @@ class WindowManager implements AppModule {
 		this.#tray = new ElectronTray(
 			isMac()
 				? trayImage
-				: path.resolve(process.cwd(), "resources/icons/win", "icon.ico"),
+				: path.resolve(rootPath, "resources/icons/win", "icon.ico"),
 		);
 
 		const contextMenu = Menu.buildFromTemplate([

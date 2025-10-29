@@ -90,7 +90,6 @@ export const DeployConfigComponent: React.FC<DeployConfigProps> = ({
 							display: "flex",
 							alignItems: "center",
 							justifyContent: "space-between",
-							mb: 2,
 						}}
 					>
 						<Typography variant="h6" component="div">
@@ -155,7 +154,7 @@ export const DeployConfigComponent: React.FC<DeployConfigProps> = ({
 					<Divider sx={{ my: 2 }} />
 
 					{/* Configuration Overview */}
-					<Grid container spacing={3}>
+					<Grid container spacing={1}>
 						{/* Account Information */}
 						<Grid size={12}>
 							<Box
@@ -171,7 +170,7 @@ export const DeployConfigComponent: React.FC<DeployConfigProps> = ({
 										display: "flex",
 										alignItems: "center",
 										gap: 1,
-										mb: 2,
+										mb: 1,
 										fontWeight: 600,
 									}}
 								>
@@ -238,7 +237,7 @@ export const DeployConfigComponent: React.FC<DeployConfigProps> = ({
 										display: "flex",
 										alignItems: "center",
 										gap: 1,
-										mb: 2,
+										mb: 1,
 										fontWeight: 600,
 									}}
 								>
