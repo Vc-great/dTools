@@ -96,7 +96,7 @@ function Settings() {
 													{settingData?.version || "N/A"}
 												</Typography>
 											</Box>
-											<Box
+											{/*											<Box
 												sx={{
 													display: "flex",
 													justifyContent: "space-between",
@@ -112,7 +112,7 @@ function Settings() {
 															).toLocaleString()
 														: "N/A"}
 												</Typography>
-											</Box>
+											</Box>*/}
 										</Box>
 									</CardContent>
 								</Card>
